@@ -190,14 +190,35 @@ class PlayerController extends ChangeNotifier {
         path: path,
         noOfSamples: actualNoOfSamples,
       )
-          .then(
+          .then<void>(
         (value) {
           waveformExtraction.waveformData
             ..clear()
             ..addAll(value);
           notifyListeners();
         },
+        // voimero patch (VENDORED.md 変更 4): ここは **await していない** fire-and-forget。
+        // 変更 4 で stop が打ち切りを返すようになったので、そのまま流すと
+        // 「ハンドラが繋がれていない Future がエラーで解決」になって app 全体の
+        // Zone に飛ぶ（実機の integration test で実際に出た。preparePlayer のあと
+        // すぐに dispose する経路がこれに当たる）。
+        // 打ち切りは「必要とされなくなった」だけの意味なのでここで捨てる。
+        // 他の失敗は今までどおり流す（もともと unhandled だった経路なので、
+        // 黙らせるより見せたほうが正しい）。
+        //
+        // `catchError` にしなかった理由: `Future<List<double>>.catchError` の
+        // ハンドラは **同じ型を返さないと実行時に落ちる**
+        // （`ArgumentError: The error handler of Future.catchError must return a
+        // value of the future's type` — 実際のテストで出た）。`then<void>` の
+        // `onError` は `FutureOr<void>` を返せるので型の問題がない。
+        onError: (Object error) {
+          if (error is WaveformExtractionStoppedException) {
+            return;
+          }
+          throw error;
+        },
       );
+
     }
     notifyListeners();
   }

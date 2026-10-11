@@ -65,6 +65,9 @@ object Constants {
     const val noOfSamples = "noOfSamples"
     const val onCurrentExtractedWaveformData = "onCurrentExtractedWaveformData"
     const val waveformData = "waveformData"
+    // voimero: stop() で打ち切ったときに返すエラーコード（VENDORED.md 変更 4）。
+    // Dart 側の `Constants.extractionStopped` と必ず同じ文字列にすること。
+    const val extractionStopped = "extraction_stopped"
     const val updateFrequency = "updateFrequency"
     const val STOP_EXTRACTION = "stopExtraction"
 

@@ -47,6 +47,10 @@ class Constants {
   static const String onCurrentExtractedWaveformData =
       "onCurrentExtractedWaveformData";
   static const String stopExtraction = "stopExtraction";
+  /// voimero: Android の `Constants.extractionStopped` と必ず同じ文字列にする。
+  /// 抽出中に stop() されたときに返信されるコードで、これを拾って
+  /// [WaveformExtractionStoppedException] に変換する（VENDORED.md 変更 4）。
+  static const String extractionStopped = "extraction_stopped";
   static const String useLegacyNormalization = "useLegacyNormalization";
   static const String updateFrequency = "updateFrequency";
   static const String overrideAudioSession = "overrideAudioSession";

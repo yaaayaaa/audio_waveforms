@@ -25,6 +25,11 @@ class WaveformExtractionController {
 
   final String _extractorKey;
 
+  /// voimero: `PlayerController.playerKey` に対応する公開名。打ち切りの例外
+  /// ([WaveformExtractionStoppedException.playerKey]) に載る key なので、
+  /// 呼び出し側が自分の抽出と突き止められるようにする（VENDORED.md 変更 4）。
+  String get playerKey => _extractorKey;
+
   final List<double> _waveformData = [];
 
   /// This returns waveform data which can be used by [AudioFileWaveforms]
@@ -99,11 +104,24 @@ class WaveformExtractionController {
       actualNoOfSamples = noOfSamples ?? 100;
     }
 
-    return await AudioWaveformsInterface.instance.extractWaveformData(
-      key: _extractorKey,
-      path: path,
-      noOfSamples: actualNoOfSamples,
-    );
+    // voimero patch (VENDORED.md 変更 4): Android の stop() は打ち切りを
+    // `result.error(extraction_stopped)` で返す。上流はここで何も返さなかったので
+    // `await extractWaveformData` が一生解決しなかった。エラーのまま投げると
+    // 「失敗したのか打ち切られたのか」が呼び出し側で区別できないので、打ち切りは
+    // 専用の例外に変換する（**打ち切りは失敗ではない**ので、失敗用の snackbar や
+    // Crashlytics に流さないためにも型で分けておく）。
+    try {
+      return await AudioWaveformsInterface.instance.extractWaveformData(
+        key: _extractorKey,
+        path: path,
+        noOfSamples: actualNoOfSamples,
+      );
+    } on PlatformException catch (error) {
+      if (error.code == Constants.extractionStopped) {
+        throw WaveformExtractionStoppedException(_extractorKey);
+      }
+      rethrow;
+    }
   }
 
   /// Stops current waveform extraction, if any.
@@ -111,4 +129,29 @@ class WaveformExtractionController {
     return await AudioWaveformsInterface.instance
         .stopWaveformExtraction(_extractorKey);
   }
+}
+
+/// 抽出が完了する前に止められたことを表す例外。
+///
+/// 送り主は [WaveformExtractionController.stopWaveformExtraction]（と、それを呼ぶ
+/// `PlayerController.dispose`、および同じ playerKey への再抽出）で、「抽出結果が
+/// **必要とされなくなった**」という意味しか持たない。失敗と違って音声ファイルは
+/// 壊れていないので、そのまま再試行すれば成功する。
+///
+/// 打ち切りを失敗と区別できるようにしたのは、呼び出し側が失敗用の snackbar や
+/// Crashlytics に流さないため。
+///
+/// iOS は stop で FlutterResult を解決しない（`WaveformExtractor.swift` が stop 時に
+/// 返信しない）ので、この例外が飛んでくるのは Android のみ。iOS 側は今までどおり
+/// Future が解決しないままなので、**プラットフォームで挙動が違う**ことは上流への
+/// issue に書く。
+class WaveformExtractionStoppedException implements Exception {
+  WaveformExtractionStoppedException(this.playerKey);
+
+  final String playerKey;
+
+  @override
+  String toString() => 'Waveform extraction for playerKey "$playerKey" was '
+      'stopped before it completed. This is not a failure: the data was no '
+      'longer needed.';
 }

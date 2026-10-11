@@ -52,4 +52,6 @@ android {
 dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation "com.google.android.exoplayer:exoplayer:2.17.1"
+    // 纯ロジック (ExtractionLifecycle) の JVM unit test 用。Android フレームワークは触らない。
+    testImplementation 'junit:junit:4.13.2'
 }
